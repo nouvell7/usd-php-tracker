@@ -1,0 +1,14 @@
+-- 최근 10일간의 샘플 데이터 생성
+INSERT INTO exchange_rates (date, usd_php_rate, dollar_index, ma_20, ma_50)
+VALUES 
+  (CURRENT_DATE, 56.50, 104.50, 56.45, 56.40),
+  (CURRENT_DATE - INTERVAL '1 day', 56.45, 104.45, 56.44, 56.39),
+  (CURRENT_DATE - INTERVAL '2 days', 56.48, 104.48, 56.43, 56.38),
+  (CURRENT_DATE - INTERVAL '3 days', 56.42, 104.42, 56.42, 56.37),
+  (CURRENT_DATE - INTERVAL '4 days', 56.55, 104.55, 56.41, 56.36),
+  (CURRENT_DATE - INTERVAL '5 days', 56.40, 104.40, 56.40, 56.35),
+  (CURRENT_DATE - INTERVAL '6 days', 56.38, 104.38, 56.39, 56.34),
+  (CURRENT_DATE - INTERVAL '7 days', 56.52, 104.52, 56.38, 56.33),
+  (CURRENT_DATE - INTERVAL '8 days', 56.47, 104.47, 56.37, 56.32),
+  (CURRENT_DATE - INTERVAL '9 days', 56.43, 104.43, 56.36, 56.31)
+ON CONFLICT (date) DO NOTHING; 
