@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRecentRates } from '../hooks/useExchangeRates'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { updateMissingRates } from '../services/exchangeRateService'
+import { useQueryClient } from '@tanstack/react-query'
 
 type Period = '1D' | '1W' | '2W' | '1M' | '3M' | '6M' | '1Y'
 
@@ -40,6 +42,7 @@ const periods: { label: string; value: Period }[] = [
 export default function RateHistory() {
   const [period, setPeriod] = useState<Period>('1W')
   const { data: rates, isLoading, error } = useRecentRates(365)
+  const queryClient = useQueryClient()
 
   const filteredRates = useMemo(() => {
     if (!rates) return []
@@ -112,6 +115,17 @@ export default function RateHistory() {
       hasCreatedAt: !!lastRate.created_at
     };
   }, [filteredRates]);
+
+  useEffect(() => {
+    // 누락된 데이터 업데이트
+    updateMissingRates()
+      .then(rates => {
+        console.log('Missing rates updated successfully:', rates);
+        // 데이터 갱신을 위해 react-query 캐시 무효화
+        queryClient.invalidateQueries({ queryKey: ['recentRates'] });
+      })
+      .catch(error => console.error('Failed to update missing rates:', error));
+  }, [queryClient]);
 
   if (isLoading) {
     return (
