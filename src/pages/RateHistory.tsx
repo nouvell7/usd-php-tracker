@@ -3,6 +3,7 @@ import { useRecentRates } from '../hooks/useExchangeRates'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { updateMissingRates } from '../services/exchangeRateService'
 import { useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../lib/supabase'
 
 type Period = '1D' | '1W' | '2W' | '1M' | '3M' | '6M' | '1Y'
 
@@ -127,14 +128,23 @@ export default function RateHistory() {
   }, [filteredRates]);
 
   useEffect(() => {
-    // 누락된 데이터 업데이트
-    updateMissingRates()
-      .then(rates => {
-        console.log('Missing rates updated successfully:', rates);
-        // 데이터 갱신을 위해 react-query 캐시 무효화
-        queryClient.invalidateQueries({ queryKey: ['recentRates'] });
-      })
-      .catch(error => console.error('Failed to update missing rates:', error));
+    // 로그인 상태일 때만 누락된 데이터 업데이트 시도
+    const session = supabase.auth.getSession();
+    if (session) {
+      updateMissingRates()
+        .then(rates => {
+          console.log('Missing rates updated successfully:', rates);
+          queryClient.invalidateQueries({ queryKey: ['recentRates'] });
+        })
+        .catch(error => {
+          console.error('Failed to update missing rates:', error);
+          // 인증 오류는 무시 (일반 사용자는 조회만 가능)
+          if (error.message !== 'Authentication required') {
+            // 다른 오류는 표시
+            console.error('Error:', error);
+          }
+        });
+    }
   }, [queryClient]);
 
   useEffect(() => {

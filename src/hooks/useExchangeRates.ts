@@ -41,15 +41,19 @@ export function useRecentRates(days = 30) {
         .select('*')
         .gte('date', startDateStr)
         .lte('date', endDate)
-        .order('date', { ascending: true });  // 날짜 오름차순 정렬
+        .order('date', { ascending: true });
       
       if (error) {
-        console.error('Error fetching rates:', error);
+        console.error('Supabase error:', error);
         throw error;
       }
 
-      console.log('Fetched rates:', data);  // 데이터 로깅 추가
-      return data;
+      if (!data || data.length === 0) {
+        console.warn('No data found in the specified date range');
+      }
+
+      console.log('Fetched rates:', data);
+      return data || [];
     },
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000
