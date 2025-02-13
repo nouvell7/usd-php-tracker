@@ -136,10 +136,10 @@ export default function RateHistory() {
           const rates = await updateMissingRates();
           console.log('Missing rates updated successfully:', rates);
           queryClient.invalidateQueries({ queryKey: ['recentRates'] });
-        } catch (error) {
+        } catch (error: any) {  // 타입 명시
           console.error('Failed to update missing rates:', error);
           // 인증 오류는 무시 (일반 사용자는 조회만 가능)
-          if (error.message !== 'Authentication required') {
+          if (error?.message !== 'Authentication required') {
             // 다른 오류는 표시
             console.error('Error:', error);
           }
