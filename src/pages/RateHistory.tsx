@@ -128,23 +128,27 @@ export default function RateHistory() {
   }, [filteredRates]);
 
   useEffect(() => {
-    // 로그인 상태일 때만 누락된 데이터 업데이트 시도
-    const session = supabase.auth.getSession();
-    if (session) {
-      updateMissingRates()
-        .then(rates => {
+    // 세션 체크를 async 함수로 분리
+    const checkSessionAndUpdate = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        try {
+          const rates = await updateMissingRates();
           console.log('Missing rates updated successfully:', rates);
           queryClient.invalidateQueries({ queryKey: ['recentRates'] });
-        })
-        .catch(error => {
+        } catch (error) {
           console.error('Failed to update missing rates:', error);
           // 인증 오류는 무시 (일반 사용자는 조회만 가능)
           if (error.message !== 'Authentication required') {
             // 다른 오류는 표시
             console.error('Error:', error);
           }
-        });
-    }
+        }
+      }
+    };
+
+    // 세션 체크 및 업데이트 실행
+    checkSessionAndUpdate();
   }, [queryClient]);
 
   useEffect(() => {
