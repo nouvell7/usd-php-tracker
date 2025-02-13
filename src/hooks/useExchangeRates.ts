@@ -30,6 +30,7 @@ export function useRecentRates(days = 30) {
       const today = new Date();
       const endDate = today.toISOString().split('T')[0];
       
+      // 시작 날짜를 현재 날짜에서 뒤로 계산
       const startDate = new Date(today);
       startDate.setDate(startDate.getDate() - days);
       const startDateStr = startDate.toISOString().split('T')[0];
@@ -49,7 +50,9 @@ export function useRecentRates(days = 30) {
       }
 
       if (!data || data.length === 0) {
-        console.warn('No data found in the specified date range');
+        console.warn('No data found in the specified date range:', { startDateStr, endDate });
+      } else {
+        console.log(`Found ${data.length} records in date range:`, { startDateStr, endDate });
       }
 
       console.log('Fetched rates:', data);
