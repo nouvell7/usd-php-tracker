@@ -6,59 +6,54 @@ interface ExchangeRateData {
   dollar_index?: number | null
 }
 
-interface AlphaVantageForexResponse {
-  "Time Series FX (Daily)": {
-    [key: string]: {
-      "4. close": string
+// Frankfurter API 사용 (무료, 안정적)
+const FOREX_API_URL = 'https://api.frankfurter.app';
+
+export async function fetchLatestExchangeRate(): Promise<ExchangeRateData> {
+  try {
+    console.log('Fetching latest exchange rate...');
+    
+    const response = await fetch(`${FOREX_API_URL}/latest?from=USD&to=PHP`);
+    const data = await response.json();
+    
+    if (!data.rates.PHP) {
+      throw new Error('Failed to fetch PHP rate');
     }
+
+    return {
+      date: new Date().toISOString().split('T')[0],
+      usd_php_rate: data.rates.PHP,
+      dollar_index: null // DXY는 별도로 처리
+    };
+  } catch (error) {
+    console.error('Failed to fetch latest rate:', error);
+    throw error;
   }
 }
-
-interface AlphaVantageRealtimeResponse {
-  "Realtime Currency Exchange Rate": {
-    "5. Exchange Rate": string
-    "6. Last Refreshed": string
-  }
-}
-
-const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
-const FOREX_DAILY_URL = `https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=USD&to_symbol=PHP&outputsize=full&apikey=${API_KEY}`;
-const DXY_URL = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=DXY&outputsize=full&apikey=${API_KEY}`;
-const FOREX_REALTIME_URL = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=USD&to_currency=PHP&apikey=${API_KEY}`;
 
 export async function fetchHistoricalRates(): Promise<ExchangeRateData[]> {
   try {
     console.log('Fetching historical exchange rates...');
     
-    // USD/PHP 환율 데이터 가져오기
-    const forexResponse = await fetch(FOREX_DAILY_URL);
-    const forexData: AlphaVantageForexResponse = await forexResponse.json();
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date();
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    const startDateStr = startDate.toISOString().split('T')[0];
     
-    if (!forexData["Time Series FX (Daily)"]) {
-      throw new Error('Failed to fetch forex data');
+    const response = await fetch(
+      `${FOREX_API_URL}/${startDateStr}..${endDate}?from=USD&to=PHP`
+    );
+    const data = await response.json();
+    
+    if (!data.rates) {
+      throw new Error('Failed to fetch historical rates');
     }
 
-    // DXY (달러 인덱스) 데이터 가져오기
-    const dxyResponse = await fetch(DXY_URL);
-    const dxyData = await dxyResponse.json();
-    
-    // 최근 1년치 데이터 추출
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    
-    const historicalRates = Object.entries(forexData["Time Series FX (Daily)"])
-      .filter(([date]) => new Date(date) >= oneYearAgo)
-      .map(([date, values]) => {
-        const dxyValue = dxyData["Time Series (Daily)"]?.[date]?.["4. close"];
-        return {
-          date,
-          usd_php_rate: parseFloat(values["4. close"]),
-          dollar_index: dxyValue ? parseFloat(dxyValue) : null
-        };
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    return historicalRates;
+    return Object.entries(data.rates).map(([date, rates]: [string, any]) => ({
+      date,
+      usd_php_rate: rates.PHP,
+      dollar_index: null
+    }));
   } catch (error) {
     console.error('Failed to fetch historical rates:', error);
     throw error;
@@ -130,32 +125,49 @@ export async function calculateMovingAverages() {
   return { ma_20: ma20, ma_50: ma50 }
 }
 
-export async function fetchLatestExchangeRate(): Promise<ExchangeRateData> {
+// 누락된 기간의 데이터를 가져와서 Supabase에 추가하는 함수
+export async function updateMissingRates() {
   try {
-    console.log('Fetching latest exchange rate...');
+    const startDate = '2024-02-09';
+    const endDate = '2024-02-13';
     
-    // USD/PHP 실시간 환율 가져오기
-    const forexResponse = await fetch(FOREX_REALTIME_URL);
-    const forexData: AlphaVantageRealtimeResponse = await forexResponse.json();
+    console.log('Fetching missing rates...', { startDate, endDate });
     
-    if (!forexData["Realtime Currency Exchange Rate"]) {
-      throw new Error('Failed to fetch realtime forex data');
+    const response = await fetch(
+      `${FOREX_API_URL}/${startDate}..${endDate}?from=USD&to=PHP`
+    );
+    const data = await response.json();
+    
+    if (!data.rates) {
+      throw new Error('Failed to fetch missing rates');
     }
 
-    // DXY (달러 인덱스) 데이터 가져오기
-    const dxyResponse = await fetch(DXY_URL);
-    const dxyData = await dxyResponse.json();
-    
-    const latestDxyDate = Object.keys(dxyData["Time Series (Daily)"])[0];
-    const latestDxyValue = dxyData["Time Series (Daily)"]?.[latestDxyDate]?.["4. close"];
+    const missingRates = Object.entries(data.rates).map(([date, rates]: [string, any]) => ({
+      date,
+      usd_php_rate: rates.PHP,
+      dollar_index: null
+    }));
 
-    return {
-      date: new Date().toISOString().split('T')[0],
-      usd_php_rate: parseFloat(forexData["Realtime Currency Exchange Rate"]["5. Exchange Rate"]),
-      dollar_index: latestDxyValue ? parseFloat(latestDxyValue) : null
-    };
+    console.log('Fetched missing rates:', missingRates);
+
+    // Supabase에 데이터 삽입
+    const { error } = await supabase
+      .from('exchange_rates')
+      .upsert(missingRates, {
+        onConflict: 'date'
+      });
+
+    if (error) throw error;
+
+    console.log('Missing rates updated in database');
+    
+    // 이동평균 재계산
+    await calculateMovingAverages();
+    console.log('Moving averages recalculated');
+
+    return missingRates;
   } catch (error) {
-    console.error('Failed to fetch latest rate:', error);
+    console.error('Failed to update missing rates:', error);
     throw error;
   }
 } 
