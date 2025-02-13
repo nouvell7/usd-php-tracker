@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useRecentRates } from '../hooks/useExchangeRates'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { updateMissingRates, updateLatestRates } from '../services/exchangeRateService'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
@@ -120,6 +120,7 @@ export default function RateHistory() {
       avg: filteredRates.reduce((sum, r) => sum + r.usd_php_rate, 0) / filteredRates.length,
       current: filteredRates[filteredRates.length - 1].usd_php_rate,
       change: filteredRates[filteredRates.length - 1].usd_php_rate - filteredRates[0].usd_php_rate,
+      dollarIndex: filteredRates[filteredRates.length - 1].dollar_index,
     }
   }, [filteredRates])
 
@@ -151,7 +152,7 @@ export default function RateHistory() {
   const handleUpdateRates = async () => {
     try {
       setIsUpdating(true);
-      const newRates = await updateLatestRates(period);
+      await updateLatestRates(period);
       queryClient.invalidateQueries({ queryKey: ['recentRates'] });
     } catch (error: any) {
       if (error.message === 'Authentication required') {
@@ -288,7 +289,7 @@ export default function RateHistory() {
           </div>
 
           {stats && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
               <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
                 <p className="text-sm text-gray-500">Current</p>
                 <p className="text-lg sm:text-xl font-semibold">₱{stats.current.toFixed(4)}</p>
@@ -313,6 +314,12 @@ export default function RateHistory() {
                   {stats.change > 0 ? '+' : ''}{stats.change.toFixed(4)}
                 </p>
               </div>
+              <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+                <p className="text-sm text-gray-500">Dollar Index</p>
+                <p className="text-lg sm:text-xl font-semibold">
+                  {stats.dollarIndex?.toFixed(2) || 'N/A'}
+                </p>
+              </div>
             </div>
           )}
 
@@ -330,27 +337,48 @@ export default function RateHistory() {
                   }}
                 />
                 <YAxis
+                  yAxisId="left"
+                  domain={['auto', 'auto']}
+                  tickFormatter={(value) => value.toFixed(2)}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
                   domain={['auto', 'auto']}
                   tickFormatter={(value) => value.toFixed(2)}
                 />
                 <Tooltip
-                  formatter={(value: number) => [`₱${value.toFixed(4)}`, 'USD/PHP Rate']}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'usd_php_rate') return [`₱${value.toFixed(4)}`, 'USD/PHP Rate'];
+                    if (name === 'dollar_index') return [value.toFixed(2), 'Dollar Index'];
+                    return [value, name];
+                  }}
                   labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
+                    day: 'numeric'
                   })}
                 />
                 <Line
+                  yAxisId="left"
                   type="monotone"
                   dataKey="usd_php_rate"
                   stroke="#3b82f6"
                   dot={false}
                   activeDot={{ r: 6 }}
+                  name="USD/PHP Rate"
                 />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="dollar_index"
+                  stroke="#10b981"
+                  dot={false}
+                  activeDot={{ r: 6 }}
+                  name="Dollar Index"
+                />
+                <Legend />
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { updateLatestRates } from '../services/exchangeRateService'
 
 export default function RateSearch() {
@@ -150,7 +150,7 @@ export default function RateSearch() {
 
             {rates.length > 0 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-500">Latest Rate</p>
                     <p className="text-lg font-semibold">
@@ -175,6 +175,12 @@ export default function RateSearch() {
                       ₱{(rates.reduce((sum, r) => sum + r.usd_php_rate, 0) / rates.length).toFixed(4)}
                     </p>
                   </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500">Dollar Index</p>
+                    <p className="text-lg font-semibold">
+                      {rates[rates.length - 1].dollar_index?.toFixed(2) || 'N/A'}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="h-[400px]">
@@ -191,11 +197,22 @@ export default function RateSearch() {
                         }}
                       />
                       <YAxis
+                        yAxisId="left"
+                        domain={['auto', 'auto']}
+                        tickFormatter={(value) => value.toFixed(2)}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
                         domain={['auto', 'auto']}
                         tickFormatter={(value) => value.toFixed(2)}
                       />
                       <Tooltip
-                        formatter={(value: number) => [`₱${value.toFixed(4)}`, 'USD/PHP Rate']}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'usd_php_rate') return [`₱${value.toFixed(4)}`, 'USD/PHP Rate'];
+                          if (name === 'dollar_index') return [value.toFixed(2), 'Dollar Index'];
+                          return [value, name];
+                        }}
                         labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', {
                           weekday: 'long',
                           year: 'numeric',
@@ -204,12 +221,24 @@ export default function RateSearch() {
                         })}
                       />
                       <Line
+                        yAxisId="left"
                         type="monotone"
                         dataKey="usd_php_rate"
                         stroke="#3b82f6"
                         dot={false}
                         activeDot={{ r: 6 }}
+                        name="USD/PHP Rate"
                       />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="dollar_index"
+                        stroke="#10b981"
+                        dot={false}
+                        activeDot={{ r: 6 }}
+                        name="Dollar Index"
+                      />
+                      <Legend />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
