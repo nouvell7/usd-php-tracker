@@ -1,28 +1,23 @@
-import { useState, useMemo } from 'react'
-import { useLatestRate, useRecentRates } from '../hooks/useExchangeRates'
-import { useExchangeRateUpdater } from '../hooks/useExchangeRateUpdater'
+import { useMemo } from 'react'
+import { useRecentRates } from '../hooks/useExchangeRates'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { RateAlertManager } from '../components/RateAlertManager'
 
 export default function Dashboard() {
-  const { data: latestRate, isLoading: isLoadingLatest } = useLatestRate()
-  const { data: recentRates, isLoading: isLoadingRates } = useRecentRates(30)  // 최근 30일 데이터
-
-  // 1시간마다 환율 업데이트
-  useExchangeRateUpdater(60)
+  const { data: rates, isLoading } = useRecentRates(30)  // latestRate 제거
 
   const stats = useMemo(() => {
-    if (!recentRates?.length) return null;
+    if (!rates?.length) return null;
     
     return {
-      current: recentRates[recentRates.length - 1].usd_php_rate,
-      dollarIndex: recentRates[recentRates.length - 1].dollar_index,
-      change: recentRates[recentRates.length - 1].usd_php_rate - recentRates[0].usd_php_rate,
-      changePercent: ((recentRates[recentRates.length - 1].usd_php_rate - recentRates[0].usd_php_rate) / recentRates[0].usd_php_rate) * 100
+      current: rates[rates.length - 1].usd_php_rate,
+      dollarIndex: rates[rates.length - 1].dollar_index,
+      change: rates[rates.length - 1].usd_php_rate - rates[0].usd_php_rate,
+      changePercent: ((rates[rates.length - 1].usd_php_rate - rates[0].usd_php_rate) / rates[0].usd_php_rate) * 100
     };
-  }, [recentRates]);
+  }, [rates]);
 
-  if (isLoadingLatest || isLoadingRates || !stats) {
+  if (isLoading || !stats) {
     return <div>Loading...</div>
   }
 
@@ -51,7 +46,7 @@ export default function Dashboard() {
               <p className="text-sm text-gray-500">30-Day Trend</p>
               <div className="h-16">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={recentRates}>
+                  <LineChart data={rates}>
                     <Line
                       type="monotone"
                       dataKey="usd_php_rate"
@@ -66,7 +61,7 @@ export default function Dashboard() {
 
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={recentRates}>
+              <LineChart data={rates}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"

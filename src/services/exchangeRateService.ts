@@ -9,9 +9,6 @@ interface ExchangeRateData {
 // Frankfurter API 사용 (무료, 안정적)
 const FOREX_API_URL = 'https://api.frankfurter.app';
 
-// 환경 변수에서 API 키 가져오기
-const ALPHA_VANTAGE_API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
-
 async function fetchLatestExchangeRate(): Promise<ExchangeRateData> {
   try {
     console.log('Fetching latest exchange rate...');
@@ -127,13 +124,6 @@ async function calculateMovingAverages() {
   if (updateError) throw updateError
 
   return { ma_20: ma20, ma_50: ma50 }
-}
-
-// 평일인지 확인하는 함수 추가
-function isWeekday(dateStr: string): boolean {
-  const date = new Date(dateStr);
-  const day = date.getDay();
-  return day !== 0 && day !== 6; // 0은 일요일, 6은 토요일
 }
 
 async function updateMissingRates() {
