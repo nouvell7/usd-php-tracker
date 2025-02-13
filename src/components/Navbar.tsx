@@ -1,48 +1,52 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
+const navigation = [
+  { name: 'Dashboard', href: '/' },
+  { name: 'Transactions', href: '/transactions' },
+  { name: 'Analysis', href: '/analysis' },
+  { name: 'Rate History', href: '/history' },
+  { name: 'Rate Search', href: '/rates/search' },  // 새로운 메뉴 항목
+]
+
 export function Navbar() {
   const { user, signOut } = useAuth()
   const location = useLocation()
 
-  const navigation = [
-    { name: 'Dashboard', href: '/' },
-    { name: 'History', href: '/history' },
-    { name: 'Transactions', href: '/transactions' },
-    { name: 'Analysis', href: '/analysis' },
-  ]
-
   return (
-    <nav className="bg-white shadow-sm">
+    <nav className="bg-white shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex items-center space-x-8">
-            <h1 className="text-xl font-semibold">USD/PHP Tracker</h1>
-            <div className="flex space-x-4">
-              {navigation.map((item) => (
+          <div className="flex">
+            <div className="flex-shrink-0 flex items-center">
+              <span className="text-xl font-bold text-gray-800">ExchangeRate</span>
+            </div>
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              {navigation.map(item => (
                 <Link
-                  key={item.name}
+                  key={item.href}
                   to={item.href}
-                  className={`${
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
                     location.pathname === item.href
-                      ? 'text-blue-600'
-                      : 'text-gray-600 hover:text-gray-900'
-                  } px-3 py-2 rounded-md text-sm font-medium`}
+                      ? 'border-blue-500 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  }`}
                 >
                   {item.name}
                 </Link>
               ))}
             </div>
           </div>
-          <div className="flex items-center">
-            <span className="mr-4">{user?.email}</span>
-            <button
-              onClick={() => signOut()}
-              className="bg-red-500 text-white px-4 py-2 rounded-md text-sm"
-            >
-              Sign Out
-            </button>
-          </div>
+          {user && (
+            <div className="flex items-center">
+              <button
+                onClick={signOut}
+                className="text-gray-500 hover:text-gray-700 text-sm font-medium"
+              >
+                Sign Out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </nav>

@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useRecentRates } from '../hooks/useExchangeRates'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { updateMissingRates } from '../services/exchangeRateService'
+import { updateMissingRates, updateLatestRates } from '../services/exchangeRateService'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { Link } from 'react-router-dom'
 
-type Period = '1D' | '1W' | '2W' | '1M' | '3M' | '6M' | '1Y'
+type Period = '1D' | '1W' | '2W' | '1M' | '3M' | '6M' | '1Y' | 'custom'
 
 const formatDateWithTime = (date: Date) => {
   const now = new Date();
@@ -44,6 +45,7 @@ export default function RateHistory() {
   const [period, setPeriod] = useState<Period>('1W')
   const { data: rates, isLoading, error } = useRecentRates(365)
   const queryClient = useQueryClient()
+  const [isUpdating, setIsUpdating] = useState(false)
 
   console.log('RateHistory render:', { rates, isLoading, error });  // 컴포넌트 상태 로깅
 
@@ -53,40 +55,59 @@ export default function RateHistory() {
       return [];
     }
     
-    console.log('Filtering rates:', rates);  // 데이터 로깅 추가
+    console.log('Raw rates data:', JSON.stringify(rates, null, 2));  // 전체 데이터 상세 로깅
     
-    const today = new Date()
-    const periodStartDate = new Date(today)
+    // 현재 날짜를 UTC 기준으로 설정
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    today.setUTCHours(0, 0, 0, 0);
+    
+    // 시작 날짜도 현재 날짜 기준으로 설정
+    const periodStartDate = new Date(today);
     
     switch (period) {
       case '1D':
-        periodStartDate.setDate(today.getDate() - 1)
+        periodStartDate.setDate(periodStartDate.getDate() - 1)
         break
       case '1W':
-        periodStartDate.setDate(today.getDate() - 7)
+        periodStartDate.setDate(periodStartDate.getDate() - 7)
         break
       case '2W':
-        periodStartDate.setDate(today.getDate() - 14)
+        periodStartDate.setDate(periodStartDate.getDate() - 14)
         break
       case '1M':
-        periodStartDate.setMonth(today.getMonth() - 1)
+        periodStartDate.setMonth(periodStartDate.getMonth() - 1)
         break
       case '3M':
-        periodStartDate.setMonth(today.getMonth() - 3)
+        periodStartDate.setMonth(periodStartDate.getMonth() - 3)
         break
       case '6M':
-        periodStartDate.setMonth(today.getMonth() - 6)
+        periodStartDate.setMonth(periodStartDate.getMonth() - 6)
         break
       case '1Y':
-        periodStartDate.setFullYear(today.getFullYear() - 1)
+        periodStartDate.setFullYear(periodStartDate.getFullYear() - 1)
         break
     }
 
+    console.log('Date range:', {
+      now: now.toISOString(),
+      today: today.toISOString(),
+      periodStart: periodStartDate.toISOString(),
+      period
+    });
+
     const filtered = rates
-      .filter(rate => new Date(rate.date) >= periodStartDate)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .filter(rate => {
+        const rateDate = new Date(rate.date);
+        const isInRange = rateDate >= periodStartDate;
+        if (rate.date === '2025-02-13') {
+          console.log('2025-02-13 rate:', rate);  // 2월 13일 데이터 특별 로깅
+        }
+        return isInRange;
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-    console.log('Filtered rates:', filtered);  // 필터링된 데이터 로깅
+    console.log('Filtered and sorted rates:', JSON.stringify(filtered, null, 2));
     return filtered;
   }, [rates, period])
 
@@ -126,6 +147,22 @@ export default function RateHistory() {
       hasCreatedAt: !!lastRate.created_at
     };
   }, [filteredRates]);
+
+  const handleUpdateRates = async () => {
+    try {
+      setIsUpdating(true);
+      const newRates = await updateLatestRates(period);
+      queryClient.invalidateQueries({ queryKey: ['recentRates'] });
+    } catch (error: any) {
+      if (error.message === 'Authentication required') {
+        alert('Please login to update rates');
+      } else {
+        alert('Failed to update rates: ' + error.message);
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   useEffect(() => {
     // 세션 체크를 async 함수로 분리
@@ -185,7 +222,36 @@ export default function RateHistory() {
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Exchange Rate History</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Exchange Rate History</h2>
+                <Link
+                  to="/rates/search"
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                >
+                  Advanced Search
+                </Link>
+                <button
+                  onClick={handleUpdateRates}
+                  disabled={isUpdating}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors
+                    ${isUpdating 
+                      ? 'bg-gray-300 cursor-not-allowed' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                >
+                  {isUpdating ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Updating...
+                    </span>
+                  ) : (
+                    'Update Rates'
+                  )}
+                </button>
+              </div>
               {lastUpdate && (
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <div className="flex flex-col">
@@ -250,81 +316,40 @@ export default function RateHistory() {
             </div>
           )}
 
-          <div className="h-[300px] sm:h-[400px] lg:h-[500px]">
+          <div className="mt-6 h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={filteredRates} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <LineChart data={filteredRates}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
+                <XAxis
                   dataKey="date"
                   tickFormatter={(date) => {
-                    const d = new Date(date)
-                    return d.toLocaleDateString('en-US', {
+                    return new Date(date).toLocaleDateString('en-US', {
                       month: '2-digit',
-                      day: '2-digit',
-                      ...(period === '1Y' && { year: '2-digit' })
-                    }).replace(/\//g, '-')
+                      day: '2-digit'
+                    });
                   }}
-                  height={50}
-                  tick={{ fontSize: 12 }}
                 />
-                <YAxis 
+                <YAxis
                   domain={['auto', 'auto']}
-                  tickFormatter={(value) => value.toFixed(4)}
-                  width={80}
-                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => value.toFixed(2)}
                 />
                 <Tooltip
-                  labelFormatter={(dateStr) => {
-                    const date = new Date(dateStr);
-                    const today = new Date();
-                    const isToday = date.toDateString() === today.toDateString();
-                    const rate = filteredRates.find(r => r.date === dateStr);
-                    
-                    const formattedDate = date.toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    });
-
-                    if (isToday) {
-                      return `${formattedDate} (Not yet updated)`;
-                    }
-
-                    // created_at이 있는 경우 그대로 사용, 없는 경우 해당 날짜의 마지막 시간 사용
-                    const updateTime = rate?.created_at 
-                      ? new Date(rate.created_at)
-                      : new Date(`${dateStr}T23:59:59.999Z`);
-
-                    const formattedTime = updateTime.toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: true
-                    });
-
-                    return `${formattedDate} ${formattedTime}`;
-                  }}
                   formatter={(value: number) => [`₱${value.toFixed(4)}`, 'USD/PHP Rate']}
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.375rem',
-                    padding: '0.75rem'
-                  }}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
                 />
                 <Line
                   type="monotone"
                   dataKey="usd_php_rate"
-                  stroke="#2563eb"
-                  strokeWidth={2}
-                  dot={period === '1D'}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="ma_20"
-                  stroke="#7c3aed"
-                  strokeWidth={1.5}
-                  strokeDasharray="5 5"
+                  stroke="#3b82f6"
+                  dot={false}
+                  activeDot={{ r: 6 }}
                 />
               </LineChart>
             </ResponsiveContainer>
