@@ -40,20 +40,21 @@ export async function fetchHistoricalRates(): Promise<ExchangeRateData[]> {
     startDate.setFullYear(startDate.getFullYear() - 1);
     const startDateStr = startDate.toISOString().split('T')[0];
     
-    const response = await fetch(
-      `${FOREX_API_URL}/${startDateStr}..${endDate}?from=USD&to=PHP`
-    );
-    const data = await response.json();
+    console.log('Date range:', { startDateStr, endDate });  // 날짜 범위 로깅
     
-    if (!data.rates) {
-      throw new Error('Failed to fetch historical rates');
+    const { data, error } = await supabase
+      .from('exchange_rates')
+      .select('*')
+      .gte('date', startDateStr)
+      .lte('date', endDate);
+    
+    if (error) {
+      console.error('Supabase error:', error);  // 에러 상세 로깅
+      throw error;
     }
 
-    return Object.entries(data.rates).map(([date, rates]: [string, any]) => ({
-      date,
-      usd_php_rate: rates.PHP,
-      dollar_index: null
-    }));
+    console.log('Fetched data:', data);  // 가져온 데이터 로깅
+    return data || [];
   } catch (error) {
     console.error('Failed to fetch historical rates:', error);
     throw error;

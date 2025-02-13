@@ -44,6 +44,8 @@ export default function RateHistory() {
   const { data: rates, isLoading, error } = useRecentRates(365)
   const queryClient = useQueryClient()
 
+  console.log('RateHistory render:', { rates, isLoading, error });  // 컴포넌트 상태 로깅
+
   const filteredRates = useMemo(() => {
     if (!rates) {
       console.log('No rates data available');
@@ -134,6 +136,10 @@ export default function RateHistory() {
       })
       .catch(error => console.error('Failed to update missing rates:', error));
   }, [queryClient]);
+
+  useEffect(() => {
+    console.log('Current rates data:', rates);  // rates 데이터 변경 시 로깅
+  }, [rates]);
 
   if (isLoading) {
     return (
