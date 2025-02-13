@@ -45,7 +45,12 @@ export default function RateHistory() {
   const queryClient = useQueryClient()
 
   const filteredRates = useMemo(() => {
-    if (!rates) return []
+    if (!rates) {
+      console.log('No rates data available');
+      return [];
+    }
+    
+    console.log('Filtering rates:', rates);  // 데이터 로깅 추가
     
     const today = new Date()
     const periodStartDate = new Date(today)
@@ -74,9 +79,12 @@ export default function RateHistory() {
         break
     }
 
-    return rates
+    const filtered = rates
       .filter(rate => new Date(rate.date) >= periodStartDate)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    
+    console.log('Filtered rates:', filtered);  // 필터링된 데이터 로깅
+    return filtered;
   }, [rates, period])
 
   const stats = useMemo(() => {

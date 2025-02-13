@@ -9,7 +9,7 @@ export function useLatestRate() {
       
       const { data, error } = await supabase
         .from('exchange_rates')
-        .select('*, created_at')
+        .select('*')
         .lte('date', today)
         .order('date', { ascending: false })
         .limit(1)
@@ -38,55 +38,20 @@ export function useRecentRates(days = 30) {
       
       const { data, error } = await supabase
         .from('exchange_rates')
-        .select('*, created_at')
+        .select('*')
         .gte('date', startDateStr)
         .lte('date', endDate)
-        .order('date', { ascending: true });
+        .order('date', { ascending: true });  // 날짜 오름차순 정렬
       
       if (error) {
         console.error('Error fetching rates:', error);
         throw error;
       }
-      
-      // 데이터가 없는 날짜는 이전 날짜의 데이터로 채움
-      const filledData = [];
-      let currentDate = new Date(startDateStr);
-      let lastRate = null;
-      
-      while (currentDate <= today) {
-        const dateStr = currentDate.toISOString().split('T')[0];
-        const existingRate = data?.find(rate => rate.date === dateStr);
-        
-        if (existingRate) {
-          // created_at이 없는 경우 해당 날짜의 마지막 시간으로 설정
-          const created = existingRate.created_at 
-            ? new Date(existingRate.created_at).toISOString()
-            : `${existingRate.date}T23:59:59.999Z`;
-          
-          filledData.push({
-            ...existingRate,
-            created_at: created
-          });
-          lastRate = {
-            ...existingRate,
-            created_at: created
-          };
-        } else if (lastRate) {
-          const created = `${dateStr}T23:59:59.999Z`; // 채워진 데이터는 해당 날짜의 마지막 시간으로 설정
-          filledData.push({
-            ...lastRate,
-            date: dateStr,
-            created_at: created
-          });
-        }
-        
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-      
-      console.log('Processed rates:', filledData);
-      return filledData;
+
+      console.log('Fetched rates:', data);  // 데이터 로깅 추가
+      return data;
     },
-    staleTime: 5 * 60 * 1000, // 5분 동안 캐시 유지
-    refetchInterval: 5 * 60 * 1000 // 5분마다 자동 갱신
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000
   });
 }
